@@ -4,15 +4,14 @@ import (
 	"encoding/binary"
 	"errors"
 	"github.com/thrawn01/lsm-go/internal/assert"
+	"github.com/thrawn01/lsm-go/internal/sstable/types"
 	"math"
 )
 
 var ErrEmptyBlock = errors.New("empty block")
 
 const (
-	sizeOfUint16InBytes = 2
-	sizeOfUint32InBytes = 4
-	Tombstone           = math.MaxUint32
+	Tombstone = math.MaxUint32
 )
 
 type Block struct {
@@ -54,8 +53,8 @@ func NewBuilder(blockSize uint64) *Builder {
 
 // estimatedSize estimates the number of key-value pairs in the block
 func (b *Builder) estimatedSize() int {
-	return sizeOfUint16InBytes +
-		(len(b.offsets) * sizeOfUint16InBytes) + // offsets
+	return types.SizeOfUint16 +
+		(len(b.offsets) * types.SizeOfUint16) + // offsets
 		len(b.data) // key-value pairs
 }
 
@@ -66,7 +65,7 @@ func (b *Builder) Add(key []byte, value []byte) bool {
 	if len(value) > 0 {
 		valueLen = len(value)
 	}
-	newSize := b.estimatedSize() + len(key) + valueLen + (sizeOfUint16InBytes * 2) + sizeOfUint32InBytes
+	newSize := b.estimatedSize() + len(key) + valueLen + (types.SizeOfUint16 * 2) + types.SizeOfUint32
 
 	// If adding the key-value pair would exceed the block size limit, don't add it.
 	// (Unless the block is empty, in which case, allow the block to exceed the limit.)
@@ -108,7 +107,7 @@ func (b *Builder) Build() (*Block, error) {
 // - Block.Offsets is appended to the next len(offsets) * sizeOfUint16InBytes bytes
 // the last 2 bytes hold the number of offsets
 func Encode(b *Block) []byte {
-	bufSize := len(b.Data) + len(b.Offsets)*sizeOfUint16InBytes + sizeOfUint16InBytes
+	bufSize := len(b.Data) + len(b.Offsets)*types.SizeOfUint16 + types.SizeOfUint16
 
 	buf := make([]byte, 0, bufSize)
 	buf = append(buf, b.Data...)
@@ -123,14 +122,14 @@ func Encode(b *Block) []byte {
 // Decode converts the encoded byte slice into the provided Block
 func Decode(b *Block, bytes []byte) {
 	// The last 2 bytes hold the offset count
-	offsetCountIndex := len(bytes) - sizeOfUint16InBytes
+	offsetCountIndex := len(bytes) - types.SizeOfUint16
 	offsetCount := binary.BigEndian.Uint16(bytes[offsetCountIndex:])
 
-	offsetStartIndex := offsetCountIndex - (int(offsetCount) * sizeOfUint16InBytes)
+	offsetStartIndex := offsetCountIndex - (int(offsetCount) * types.SizeOfUint16)
 	offsets := make([]uint16, 0, offsetCount)
 
 	for i := 0; i < int(offsetCount); i++ {
-		index := offsetStartIndex + (i * sizeOfUint16InBytes)
+		index := offsetStartIndex + (i * types.SizeOfUint16)
 		offsets = append(offsets, binary.BigEndian.Uint16(bytes[index:]))
 	}
 

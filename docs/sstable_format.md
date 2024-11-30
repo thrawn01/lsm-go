@@ -2,9 +2,9 @@
 ## SSTable
 
 At a high level the SSTable consists of the following in this order:
-1. List of `Blocks` (where each Block contains KeyValue pairs)
-2. `BloomFilter` if the number of keys in SSTable is atleast DBOptions.MinFilterKeys
-3. `sstable.Index` which contains the `Offset` and `FirstKey` of each Block added above
+1. List of `block.Block` (where each Block contains KeyValue pairs)
+2. `bloom.Filter` if the number of keys in SSTable is atleast DBOptions.MinFilterKeys
+3. `BlockMeta` which contains the `Offset` and `FirstKey` of each Block added above
 4. `sstable.Info` which contains meta information of the SSTable like offset, length of `BloomFilter` and offset, length of `SsTableIndex`
 5. Finally, the offset(4 bytes) of `SsTableInfo`
 
@@ -61,13 +61,10 @@ Then we have checksum of the above data combined
 
 ### BloomFilter format 
 Assume number of keys added to BloomFilter is 'n'
-```
-╭─────────────────────┬────────────────────╮
-│numberOfHashFunctions│ bitArray of filter │
-├─────────────────────┼────────────────────┤
-│2 bytes              │ n * bitsPerKey bits│
-╰─────────────────────┴────────────────────╯
-```
+
+| Num Probes | Bloom Filter   |
+| ---------- | -------------- |
+| 2 bytes    | N * bitsPerKey |
 
 ### ssTableIndex format
 sstable.Index contains the `Offset` and `FirstKey` of each Block present in the SSTable. 
