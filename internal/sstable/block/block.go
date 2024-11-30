@@ -20,13 +20,30 @@ type Block struct {
 	Data    []byte
 }
 
-// Builder builds a block of key value
 type Builder struct {
 	offsets   []uint16
 	data      []byte
 	blockSize uint64
 }
 
+// NewBuilder builds a block of key values in the following format
+//
+// If not a tombstone then KeyValue is represented as
+// ╭─────────┬────────────────┬────────────┬──────────────────╮
+// │keyLength│ key            │ valueLength│ value            │
+// ├─────────┼────────────────┼────────────┼──────────────────┤
+// │2 bytes  │ keyLength bytes│ 4 bytes    │ valueLength bytes│
+// ╰─────────┴────────────────┴────────────┴──────────────────╯
+//
+// If it is a tombstone then KeyValue is represented as
+// ╭─────────┬────────────────┬──────────╮
+// │keyLength│ key            │ Tombstone│
+// ├─────────┼────────────────┼──────────┤
+// │2 bytes  │ keyLength bytes│ 4 bytes  │
+// ╰─────────┴────────────────┴──────────╯
+//
+// The returned Block struct contains the Data as described
+// and the Offsets of each key value in the block.
 func NewBuilder(blockSize uint64) *Builder {
 	return &Builder{
 		offsets:   make([]uint16, 0),
