@@ -27,19 +27,33 @@ type Builder struct {
 
 // NewBuilder builds a block of key values in the following format
 //
-// If not a tombstone then KeyValue is represented as
-// ╭─────────┬────────────────┬────────────┬──────────────────╮
-// │keyLength│ key            │ valueLength│ value            │
-// ├─────────┼────────────────┼────────────┼──────────────────┤
-// │2 bytes  │ keyLength bytes│ 4 bytes    │ valueLength bytes│
-// ╰─────────┴────────────────┴────────────┴──────────────────╯
+// +-----------------------------------------------+
+// |               KeyValue                        |
+// +-----------------------------------------------+
+// |  +-----------------------------------------+  |
+// |  |  Key Length (2 bytes)                   |  |
+// |  +-----------------------------------------+  |
+// |  |  Key                                    |  |
+// |  +-----------------------------------------+  |
+// |  |  Value Length (4 bytes)                 |  |
+// |  +-----------------------------------------+  |
+// |  |  Value                                  |  |
+// |  +-----------------------------------------+  |
+// +-----------------------------------------------+
 //
-// If it is a tombstone then KeyValue is represented as
-// ╭─────────┬────────────────┬──────────╮
-// │keyLength│ key            │ Tombstone│
-// ├─────────┼────────────────┼──────────┤
-// │2 bytes  │ keyLength bytes│ 4 bytes  │
-// ╰─────────┴────────────────┴──────────╯
+// If it is a tombstone then KeyValue is represented as.
+//
+// +-----------------------------------------------+
+// |               KeyValue (Tombstone)            |
+// +-----------------------------------------------+
+// |  +-----------------------------------------+  |
+// |  |  Key Length (2 bytes)                   |  |
+// |  +-----------------------------------------+  |
+// |  |  Key                                    |  |
+// |  +-----------------------------------------+  |
+// |  |  Tombstone (4 bytes)                    |  |
+// |  +-----------------------------------------+  |
+// +-----------------------------------------------+
 //
 // The returned Block struct contains the Data as described
 // and the Offsets of each key value in the block.
@@ -102,10 +116,31 @@ func (b *Builder) Build() (*Block, error) {
 	}, nil
 }
 
-// Encode encodes the Block into a byte slice.
-// - Block.Data is appended to the first len(data) bytes
-// - Block.Offsets is appended to the next len(offsets) * sizeOfUint16InBytes bytes
-// the last 2 bytes hold the number of offsets
+// Encode encodes the Block into a byte slice with the following format
+//
+// +-----------------------------------------------+
+// |               Block                           |
+// +-----------------------------------------------+
+// |  +-----------------------------------------+  |
+// |  |  Block.Data                             |  |
+// |  |  (List of KeyValues)                    |  |
+// |  |  +-----------------------------------+  |  |
+// |  |  | KeyValue Pair                     |  |  |
+// |  |  +-----------------------------------+  |  |
+// |  |  ...                                 |  |  |
+// |  +-----------------------------------------+  |
+// |                                               |
+// |  +-----------------------------------------+  |
+// |  |  Block.Offsets                          |  |
+// |  |  +-----------------------------------+  |  |
+// |  |  |  Offset of KeyValue (4 bytes)     |  |  |
+// |  |  +-----------------------------------+  |  |
+// |  |  ...                                    |  |
+// |  +-----------------------------------------+  |
+// |  +-----------------------------------------+  |
+// |  |  Number of Offsets (2 bytes)            |  |
+// |  +-----------------------------------------+  |
+// +-----------------------------------------------+
 func Encode(b *Block) []byte {
 	bufSize := len(b.Data) + len(b.Offsets)*types.SizeOfUint16 + types.SizeOfUint16
 

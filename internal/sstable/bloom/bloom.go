@@ -28,10 +28,22 @@ func (f *Filter) HasKey(key []byte) bool {
 // Encode encodes the bloom filter into a byte slice using binary.BigEndian
 // in the following format
 //
-// | Num Probes | Bloom Filter   |
-// | ---------- | -------------- |
-// | 2 bytes    | N * bitsPerKey |
-
+// +-----------------------------------------------+
+// |               Bloom Filter                    |
+// +-----------------------------------------------+
+// |  +-----------------------------------------+  |
+// |  |  Num of Probes (2 bytes)                |  |
+// |  +-----------------------------------------+  |
+// |  +-----------------------------------------+  |
+// |  |  Bit Array (N * bitsPerKey)             |  |
+// |  |  +-----------------------------------+  |  |
+// |  |  |  Bit 0                            |  |  |
+// |  |  |  Bit 1                            |  |  |
+// |  |  |  ...                              |  |  |
+// |  |  +-----------------------------------+  |  |
+// |  +-----------------------------------------+  |
+// |                                               |
+// +-----------------------------------------------+
 func Encode(f *Filter) []byte {
 	encoded := make([]byte, 2+len(f.Data))
 	binary.BigEndian.PutUint16(encoded[:2], f.NumProbes)
@@ -51,13 +63,13 @@ func Decode(data []byte) *Filter {
 	}
 }
 
-type FilterBuilder struct {
+type Builder struct {
 	keyHashes  []uint64
 	bitsPerKey uint32
 }
 
-func NewFilterBuilder(bitsPerKey uint32) *FilterBuilder {
-	return &FilterBuilder{
+func NewFilterBuilder(bitsPerKey uint32) *Builder {
+	return &Builder{
 		keyHashes:  make([]uint64, 0),
 		bitsPerKey: bitsPerKey,
 	}
@@ -65,12 +77,12 @@ func NewFilterBuilder(bitsPerKey uint32) *FilterBuilder {
 
 // Add adds a new key to the bloom filter. This method
 // assumes the keys added are all unique.
-func (b *FilterBuilder) Add(key []byte) {
+func (b *Builder) Add(key []byte) {
 	b.keyHashes = append(b.keyHashes, filterHash(key))
 }
 
 // Build builds the bloom filter using enhanced double hashing
-func (b *FilterBuilder) Build() *Filter {
+func (b *Builder) Build() *Filter {
 	if len(b.keyHashes) == 0 {
 		return &Filter{}
 	}

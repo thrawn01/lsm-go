@@ -1,5 +1,10 @@
 package sstable
 
+import (
+	"github.com/thrawn01/lsm-go/internal/flatbuf"
+	"github.com/thrawn01/lsm-go/internal/sstable/bloom"
+)
+
 type CompressionCodec int8
 
 const (
@@ -56,7 +61,7 @@ type Range struct {
 	End uint64
 }
 
-type ReadOnly interface {
+type ReadOnlyBlob interface {
 	Len() (int, error)
 	ReadRange(r Range) ([]byte, error)
 	Read() ([]byte, error)
@@ -86,20 +91,38 @@ type Config struct {
 	Compression CompressionCodec
 }
 
-type Encoder struct {
+// Table is the in memory representation of an SSTable.
+type Table struct {
+	// Info contains the offset information used to parse the encoded table
+	Info *Info
+
+	// Bloom is the bloom filter associated with the encoded table. If
+	// the bloom filter is not nil, can be used to identify if a key exists in this table.
+	Bloom *bloom.Filter
+
+	// Data is the encoded table suitable for writing to disk
+	Data []byte
 }
 
-func NewEncoder(conf *Config) *Encoder {
-	return &Encoder{}
+// Index is the in memory representation of the SSTable index
+type Index struct {
+	// Data contains the flat buffer encoded index
+	Data []byte
 }
 
-type Decoder struct {
+// AsFlatBuf returns the Index marshalled into a flat buffer SSTableIndex struct
+func (e Index) AsFlatBuf() *flatbuf.SsTableIndex {
+	return flatbuf.GetRootAsSsTableIndex(e.Data, 0)
 }
 
-func NewDecoder(conf *Config) *Decoder {
-	return &Decoder{}
+func (e Index) Size() int {
+	return len(e.Data)
 }
 
-func (e *Decoder) ReadInfo(store ReadOnly) (*Info, error) {
-	return nil, nil // TODO
+func (e Index) Clone() Index {
+	data := make([]byte, len(e.Data))
+	copy(data, e.Data)
+	return Index{
+		Data: data,
+	}
 }
