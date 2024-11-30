@@ -1,4 +1,4 @@
-# LSM Implementation using AI
+# LSM Implementation built with AI
 
 This is a Log-Structured Merge-tree (LSM) implementation similar to the Golang port of SlateDB, 
 an embedded storage engine built on top of object storage. The purpose of this project is for me to
