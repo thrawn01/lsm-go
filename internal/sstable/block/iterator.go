@@ -26,7 +26,7 @@ func NewIteratorAtKey(block *Block, key []byte) *Iterator {
 	index := sort.Search(len(block.Offsets), func(i int) bool {
 		off := block.Offsets[i]
 		keyLen := binary.BigEndian.Uint16(block.Data[off:])
-		off += sizeOfUint16InBytes
+		off += types.SizeOfUint16
 		curKey := block.Data[off : off+keyLen]
 		return bytes.Compare(curKey, key) >= 0
 	})
@@ -65,13 +65,13 @@ func (iter *Iterator) NextEntry() (types.KeyValue, bool) {
 
 	// Read KeyLength(uint16), Key, (ValueLength(uint32), value)/Tombstone(uint32) from data
 	keyLen := binary.BigEndian.Uint16(data[offset:])
-	offset += sizeOfUint16InBytes
+	offset += types.SizeOfUint16
 
 	result.Key = data[offset : offset+keyLen]
 	offset += keyLen
 
 	valueLen := binary.BigEndian.Uint32(data[offset:])
-	offset += sizeOfUint32InBytes
+	offset += types.SizeOfUint32
 
 	if valueLen != Tombstone {
 		result.Value = types.Value{

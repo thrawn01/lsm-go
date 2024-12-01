@@ -5,10 +5,14 @@ import (
 	"errors"
 	"github.com/thrawn01/lsm-go/internal/assert"
 	"github.com/thrawn01/lsm-go/internal/sstable/types"
+	"hash/crc32"
 	"math"
 )
 
-var ErrEmptyBlock = errors.New("empty block")
+var (
+	ErrEmptyBlock     = errors.New("empty block")
+	ErrChecksumFailed = errors.New("block checksum failed")
+)
 
 const (
 	Tombstone = math.MaxUint32
@@ -17,6 +21,14 @@ const (
 type Block struct {
 	Offsets []uint16
 	Data    []byte
+}
+
+func (b *Block) FirstKey() []byte {
+	if len(b.Offsets) == 0 {
+		return nil
+	}
+	keyLen := binary.BigEndian.Uint16(b.Data[b.Offsets[0]:])
+	return b.Data[b.Offsets[0]+2 : b.Offsets[0]+2+keyLen]
 }
 
 type Builder struct {
@@ -129,7 +141,6 @@ func (b *Builder) Build() (*Block, error) {
 // |  |  +-----------------------------------+  |  |
 // |  |  ...                                 |  |  |
 // |  +-----------------------------------------+  |
-// |                                               |
 // |  +-----------------------------------------+  |
 // |  |  Block.Offsets                          |  |
 // |  |  +-----------------------------------+  |  |
@@ -137,12 +148,15 @@ func (b *Builder) Build() (*Block, error) {
 // |  |  +-----------------------------------+  |  |
 // |  |  ...                                    |  |
 // |  +-----------------------------------------+  |
+// |                                               |
 // |  +-----------------------------------------+  |
 // |  |  Number of Offsets (2 bytes)            |  |
 // |  +-----------------------------------------+  |
+// |  |  CRC32 Checksum (4 bytes)               |  |
+// |  +-----------------------------------------+  |
 // +-----------------------------------------------+
 func Encode(b *Block) []byte {
-	bufSize := len(b.Data) + len(b.Offsets)*types.SizeOfUint16 + types.SizeOfUint16
+	bufSize := len(b.Data) + len(b.Offsets)*types.SizeOfUint16 + types.SizeOfUint16 + 4 // +4 for CRC32
 
 	buf := make([]byte, 0, bufSize)
 	buf = append(buf, b.Data...)
@@ -150,17 +164,31 @@ func Encode(b *Block) []byte {
 	for _, offset := range b.Offsets {
 		buf = binary.BigEndian.AppendUint16(buf, offset)
 	}
+
 	buf = binary.BigEndian.AppendUint16(buf, uint16(len(b.Offsets)))
+
+	// Calculate CRC32 checksum
+	checksum := crc32.ChecksumIEEE(buf)
+	buf = binary.BigEndian.AppendUint32(buf, checksum)
+
 	return buf
 }
 
 // Decode converts the encoded byte slice into the provided Block
-func Decode(b *Block, bytes []byte) {
-	// The last 2 bytes hold the offset count
-	offsetCountIndex := len(bytes) - types.SizeOfUint16
-	offsetCount := binary.BigEndian.Uint16(bytes[offsetCountIndex:])
+func Decode(b *Block, bytes []byte) error {
+	assert.True(len(bytes) > 6, "invalid block; block is too small; must be at least 6 bytes")
 
-	offsetStartIndex := offsetCountIndex - (int(offsetCount) * types.SizeOfUint16)
+	// Extract and verify checksum
+	dataLen := len(bytes) - 4
+	if binary.BigEndian.Uint32(bytes[dataLen:]) != crc32.ChecksumIEEE(bytes[:dataLen]) {
+		return ErrChecksumFailed
+	}
+
+	// The last 6 bytes hold the offset count (2 bytes) and CRC32 (4 bytes)
+	offset := dataLen - 2
+	offsetCount := binary.BigEndian.Uint16(bytes[offset:dataLen])
+
+	offsetStartIndex := offset - (int(offsetCount) * types.SizeOfUint16)
 	offsets := make([]uint16, 0, offsetCount)
 
 	for i := 0; i < int(offsetCount); i++ {
@@ -170,4 +198,6 @@ func Decode(b *Block, bytes []byte) {
 
 	b.Data = bytes[:offsetStartIndex]
 	b.Offsets = offsets
+
+	return nil
 }

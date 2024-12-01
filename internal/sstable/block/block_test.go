@@ -16,13 +16,39 @@ func TestNewBuilder(t *testing.T) {
 	assert.False(t, bb.IsEmpty())
 
 	b, err := bb.Build()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	encoded := block.Encode(b)
 	var decoded block.Block
-	block.Decode(&decoded, encoded)
+	assert.NoError(t, block.Decode(&decoded, encoded))
 	assert.Equal(t, b.Data, decoded.Data)
 	assert.Equal(t, b.Offsets, decoded.Offsets)
+}
+
+func TestBlockChecksumVerification(t *testing.T) {
+	bb := block.NewBuilder(4096)
+	assert.True(t, bb.Add([]byte("key1"), []byte("value1")))
+	assert.True(t, bb.Add([]byte("key2"), []byte("value2")))
+
+	b, err := bb.Build()
+	assert.NoError(t, err)
+
+	encoded := block.Encode(b)
+
+	// Test successful decoding
+	var decoded block.Block
+	err = block.Decode(&decoded, encoded)
+	assert.NoError(t, err)
+	assert.Equal(t, b.Data, decoded.Data)
+	assert.Equal(t, b.Offsets, decoded.Offsets)
+
+	// Corrupt the data
+	encoded[0] ^= 0xFF
+
+	// Test failed decoding due to checksum mismatch
+	err = block.Decode(&decoded, encoded)
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "block checksum failed")
 }
 
 func TestBlockWithTombstone(t *testing.T) {
@@ -36,7 +62,8 @@ func TestBlockWithTombstone(t *testing.T) {
 
 	encoded := block.Encode(b)
 	var decoded block.Block
-	block.Decode(&decoded, encoded)
+	err = block.Decode(&decoded, encoded)
+	assert.Nil(t, err)
 	assert.Equal(t, b.Data, decoded.Data)
 	assert.Equal(t, b.Offsets, decoded.Offsets)
 }
