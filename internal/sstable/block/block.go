@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"github.com/thrawn01/lsm-go/internal/assert"
+	"github.com/thrawn01/lsm-go/internal/flatbuf"
 	"github.com/thrawn01/lsm-go/internal/sstable/types"
 	"github.com/thrawn01/lsm-go/internal/utils"
 	"hash/crc32"
@@ -15,6 +16,7 @@ var (
 )
 
 type Block struct {
+	Meta    flatbuf.BlockMetaT
 	Offsets []uint16
 	Data    []byte
 }

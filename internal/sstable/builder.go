@@ -2,7 +2,6 @@ package sstable
 
 import (
 	"encoding/binary"
-	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/thrawn01/lsm-go/internal/flatbuf"
 	"github.com/thrawn01/lsm-go/internal/sstable/block"
 	"github.com/thrawn01/lsm-go/internal/sstable/bloom"
@@ -71,7 +70,6 @@ type Builder struct {
 	conf         Config
 	blockBuilder *block.Builder
 	blocks       []*block.Block
-	encodedSizes []int
 	bloomBuilder *bloom.Builder
 	keyCount     int
 	firstKey     []byte
@@ -95,17 +93,13 @@ func (bu *Builder) Add(key, value []byte) error {
 	}
 
 	if !bu.blockBuilder.Add(key, value) {
-		// Current block is full, build the current block and start a new one
+		// Add returns false if current block is full.
+		// Build the current block and start a new one
 		blk, err := bu.blockBuilder.Build()
 		if err != nil {
 			return err
 		}
-		encodedBlock, err := block.Encode(blk, bu.conf.Compression)
-		if err != nil {
-			return err
-		}
 		bu.blocks = append(bu.blocks, blk)
-		bu.encodedSizes = append(bu.encodedSizes, len(encodedBlock))
 		bu.blockBuilder = block.NewBuilder(uint64(bu.conf.BlockSize))
 		bu.blockBuilder.Add(key, value)
 	}
@@ -122,101 +116,66 @@ func (bu *Builder) Build() *Table {
 	// Finalize the last block if it's not empty
 	if !bu.blockBuilder.IsEmpty() {
 		blk, _ := bu.blockBuilder.Build()
-		encodedBlock, _ := block.Encode(blk, bu.conf.Compression)
 		bu.blocks = append(bu.blocks, blk)
-		bu.encodedSizes = append(bu.encodedSizes, len(encodedBlock))
 	}
 
-	var bloomFilter *bloom.Filter
-	if bu.keyCount >= bu.conf.MinFilterKeys {
-		bloomFilter = bu.bloomBuilder.Build()
-	}
-
-	// Build the index
-	index := bu.buildIndex()
-
-	// Encode everything
-	data := bu.encode(bloomFilter, index)
-
-	// Build the Info
-	info := &Info{
-		IndexOffset:      uint64(len(data) - len(index.Data) - 4), // 4 bytes for info offset
-		IndexLen:         uint64(len(index.Data)),
-		CompressionCodec: bu.conf.Compression,
-		FirstKey:         bu.firstKey,
-	}
-
-	if bloomFilter != nil {
-		info.FilterOffset = uint64(len(data) - len(bloomFilter.Data) - len(index.Data) - 4)
-		info.FilterLen = uint64(len(bloomFilter.Data))
-	}
-
-	return &Table{
-		Info:  info,
-		Bloom: bloomFilter,
-		Data:  data,
-	}
-}
-
-func (bu *Builder) buildIndex() *Index {
-	builder := flatbuffers.NewBuilder(0)
-	var blockMetaOffsets []flatbuffers.UOffsetT
-
-	offset := uint64(0)
-	for i, b := range bu.blocks {
-		firstKey := b.FirstKey()
-
-		flatbuf.BlockMetaStart(builder)
-		flatbuf.BlockMetaAddOffset(builder, offset)
-		flatbuf.BlockMetaAddFirstKey(builder, builder.CreateByteString(firstKey))
-		blockMetaOffset := flatbuf.BlockMetaEnd(builder)
-		blockMetaOffsets = append(blockMetaOffsets, blockMetaOffset)
-
-		offset += uint64(bu.encodedSizes[i])
-	}
-
-	flatbuf.SsTableIndexStartBlockMetaVector(builder, len(blockMetaOffsets))
-	for i := len(blockMetaOffsets) - 1; i >= 0; i-- {
-		builder.PrependUOffsetT(blockMetaOffsets[i])
-	}
-	blockMetaVector := builder.EndVector(len(blockMetaOffsets))
-
-	flatbuf.SsTableIndexStart(builder)
-	flatbuf.SsTableIndexAddBlockMeta(builder, blockMetaVector)
-	indexOffset := flatbuf.SsTableIndexEnd(builder)
-
-	builder.Finish(indexOffset)
-
-	return &Index{
-		Data: builder.FinishedBytes(),
-	}
-}
-
-func (bu *Builder) encode(bloomFilter *bloom.Filter, index *Index) []byte {
 	var data []byte
-
-	// Encode blocks
+	// Encode the blocks
 	for _, b := range bu.blocks {
 		d, err := block.Encode(b, bu.conf.Compression)
 		if err != nil {
 			return nil
 		}
 		data = append(data, d...)
+		b.Meta = flatbuf.BlockMetaT{
+			Offset:   uint64(len(data)),
+			FirstKey: b.FirstKey(),
+		}
 	}
 
-	// Encode bloom filter if present
-	if bloomFilter != nil {
+	var bloomFilter *bloom.Filter
+	if bu.keyCount >= bu.conf.MinFilterKeys {
+		bloomFilter = bu.bloomBuilder.Build()
 		data = append(data, bloom.Encode(bloomFilter)...)
 	}
 
-	// Encode index
-	data = append(data, index.Data...)
+	// Build the index
+	indexT := &flatbuf.SsTableIndexT{
+		BlockMeta: make([]*flatbuf.BlockMetaT, len(bu.blocks)),
+	}
+	for i, b := range bu.blocks {
+		indexT.BlockMeta[i] = &flatbuf.BlockMetaT{
+			Offset:   b.Meta.Offset,
+			FirstKey: b.Meta.FirstKey,
+		}
+	}
+	indexBytes := encodeIndex(indexT)
+	indexStartOffset := uint64(len(data))
+	data = append(data, indexBytes...)
 
-	// Encode info offset
-	infoOffset := uint32(len(data))
-	offsetBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(offsetBytes, infoOffset)
-	data = append(data, offsetBytes...)
+	// Build and Encode Info
+	info := &Info{
+		FirstKey:         bu.firstKey,
+		IndexOffset:      indexStartOffset,
+		IndexLen:         uint64(len(indexBytes)),
+		CompressionCodec: bu.conf.Compression,
+	}
 
-	return data
+	if bloomFilter != nil {
+		info.FilterOffset = uint64(len(bu.blocks) * bu.conf.BlockSize)
+		info.FilterLen = uint64(len(bloomFilter.Data) + 2) // +2 for NumProbes
+	}
+
+	infoBytes := encodeInfo(info)
+	infoOffset := uint64(len(data))
+	data = append(data, infoBytes...)
+
+	// Append the offset of Info at the end
+	data = binary.BigEndian.AppendUint64(data, infoOffset)
+
+	return &Table{
+		Info:  info,
+		Bloom: bloomFilter,
+		Data:  data,
+	}
 }

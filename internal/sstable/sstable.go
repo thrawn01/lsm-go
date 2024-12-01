@@ -102,8 +102,8 @@ type Index struct {
 }
 
 // AsFlatBuf returns the Index marshalled into a flat buffer SSTableIndex struct
-func (e Index) AsFlatBuf() *flatbuf.SsTableIndex {
-	return flatbuf.GetRootAsSsTableIndex(e.Data, 0)
+func (e Index) AsFlatBuf() *flatbuf.SsTableIndexT {
+	return flatbuf.GetRootAsSsTableIndex(e.Data, 0).UnPack()
 }
 
 func (e Index) Size() int {

@@ -35,4 +35,11 @@ all I spent about 1 hour on this package, which is pretty fast compared to how l
 taken me to write it from scratch, then throw it away and use the slatedb implementation.
 
 ### SSTable Package
-Up next.....
+The AI implemented all the flat buffer encoding and decoding after I finally understood that
+the methods I was asking it to implement needed to use `flatbuf.SsTableIndexT` instead of
+`flatbuf.SsTableIndex`. The AI had some trouble properly implementing `sstable.Builder.Build()`.
+I had to add TODO comments to the code with specific instructions to utilize `encodeIndex` which
+the AI wrote a few prompts ago. I also had to come up with a way of storing the block offsets before 
+the AI understood that calling `block.Encode()` everytime it needed an offset wasn't an efficient way 
+to solve the problem.
+
