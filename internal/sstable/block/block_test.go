@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/thrawn01/lsm-go/internal/sstable/block"
 	"github.com/thrawn01/lsm-go/internal/sstable/types"
+	"github.com/thrawn01/lsm-go/internal/utils"
 	"testing"
 )
 
@@ -18,9 +19,10 @@ func TestNewBuilder(t *testing.T) {
 	b, err := bb.Build()
 	assert.NoError(t, err)
 
-	encoded := block.Encode(b)
+	encoded, err := block.Encode(b, utils.CompressionNone)
+	assert.NoError(t, err)
 	var decoded block.Block
-	assert.NoError(t, block.Decode(&decoded, encoded))
+	assert.NoError(t, block.Decode(&decoded, encoded, utils.CompressionNone))
 	assert.Equal(t, b.Data, decoded.Data)
 	assert.Equal(t, b.Offsets, decoded.Offsets)
 }
@@ -33,11 +35,12 @@ func TestBlockChecksumVerification(t *testing.T) {
 	b, err := bb.Build()
 	assert.NoError(t, err)
 
-	encoded := block.Encode(b)
+	encoded, err := block.Encode(b, utils.CompressionNone)
+	assert.NoError(t, err)
 
 	// Test successful decoding
 	var decoded block.Block
-	err = block.Decode(&decoded, encoded)
+	err = block.Decode(&decoded, encoded, utils.CompressionNone)
 	assert.NoError(t, err)
 	assert.Equal(t, b.Data, decoded.Data)
 	assert.Equal(t, b.Offsets, decoded.Offsets)
@@ -46,8 +49,8 @@ func TestBlockChecksumVerification(t *testing.T) {
 	encoded[0] ^= 0xFF
 
 	// Test failed decoding due to checksum mismatch
-	err = block.Decode(&decoded, encoded)
-	assert.NotNil(t, err)
+	err = block.Decode(&decoded, encoded, utils.CompressionNone)
+	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "block checksum failed")
 }
 
@@ -58,12 +61,13 @@ func TestBlockWithTombstone(t *testing.T) {
 	assert.True(t, bb.Add([]byte("key3"), []byte("value3")))
 
 	b, err := bb.Build()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
-	encoded := block.Encode(b)
+	encoded, err := block.Encode(b, utils.CompressionNone)
+	assert.NoError(t, err)
 	var decoded block.Block
-	err = block.Decode(&decoded, encoded)
-	assert.Nil(t, err)
+	err = block.Decode(&decoded, encoded, utils.CompressionNone)
+	assert.NoError(t, err)
 	assert.Equal(t, b.Data, decoded.Data)
 	assert.Equal(t, b.Offsets, decoded.Offsets)
 }
@@ -81,19 +85,18 @@ func TestBlockIterator(t *testing.T) {
 	}
 
 	b, err := builder.Build()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	iter := block.NewIterator(b)
 	for i := 0; i < len(kvPairs); i++ {
 		kv, ok := iter.Next()
 		assert.True(t, ok)
-		assert.True(t, bytes.Equal(kv.Key, kv.Key))
-		assert.True(t, bytes.Equal(kv.Value, kv.Value))
+		assert.True(t, bytes.Equal(kv.Key, kvPairs[i].Key))
+		assert.True(t, bytes.Equal(kv.Value, kvPairs[i].Value))
 	}
 
 	kv, ok := iter.Next()
 	assert.False(t, ok)
-	assert.NoError(t, err)
 	assert.Equal(t, types.KV{Key: nil, Value: nil}, kv)
 }
 
@@ -110,15 +113,15 @@ func TestNewIteratorAtKey(t *testing.T) {
 	}
 
 	b, err := builder.Build()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	t.Run("KeyFound", func(t *testing.T) {
 		iter := block.NewIteratorAtKey(b, []byte("kratos"))
 		for i := 1; i < len(kvPairs); i++ {
 			kv, ok := iter.Next()
 			assert.True(t, ok)
-			assert.Equal(t, kv.Key, kv.Key)
-			assert.Equal(t, kv.Value, kv.Value)
+			assert.Equal(t, kvPairs[i].Key, kv.Key)
+			assert.Equal(t, kvPairs[i].Value, kv.Value)
 		}
 
 		kv, ok := iter.Next()
@@ -131,18 +134,54 @@ func TestNewIteratorAtKey(t *testing.T) {
 		for i := 1; i < len(kvPairs); i++ {
 			kv, ok := iter.Next()
 			assert.True(t, ok)
-			assert.Equal(t, kv.Key, kv.Key)
-			assert.Equal(t, kv.Value, kv.Value)
+			assert.Equal(t, kvPairs[i].Key, kv.Key)
+			assert.Equal(t, kvPairs[i].Value, kv.Value)
 		}
 
 		kv, ok := iter.Next()
 		assert.False(t, ok)
 		assert.Equal(t, types.KV{Key: nil, Value: nil}, kv)
 	})
+
 	t.Run("KeyAtEnd", func(t *testing.T) {
 		iter := block.NewIteratorAtKey(b, []byte("zzz"))
 		kv, ok := iter.Next()
 		assert.False(t, ok)
 		assert.Equal(t, types.KV{Key: nil, Value: nil}, kv)
 	})
+}
+
+func testCompression(t *testing.T, codec utils.CompressionCodec) {
+	t.Helper()
+	bb := block.NewBuilder(4096)
+	assert.True(t, bb.Add([]byte("key1"), []byte("value1")))
+	assert.True(t, bb.Add([]byte("key2"), []byte("value2")))
+
+	b, err := bb.Build()
+	assert.NoError(t, err)
+
+	encoded, err := block.Encode(b, codec)
+	assert.NoError(t, err)
+
+	var decoded block.Block
+	err = block.Decode(&decoded, encoded, codec)
+	assert.NoError(t, err)
+	assert.Equal(t, b.Data, decoded.Data)
+	assert.Equal(t, b.Offsets, decoded.Offsets)
+}
+
+func TestCompressionMethods(t *testing.T) {
+	codecs := []utils.CompressionCodec{
+		utils.CompressionNone,
+		utils.CompressionSnappy,
+		utils.CompressionZlib,
+		utils.CompressionLz4,
+		utils.CompressionZstd,
+	}
+
+	for _, codec := range codecs {
+		t.Run(codec.String(), func(t *testing.T) {
+			testCompression(t, codec)
+		})
+	}
 }

@@ -3,6 +3,7 @@ package sstable
 import (
 	"github.com/thrawn01/lsm-go/internal/flatbuf"
 	"github.com/thrawn01/lsm-go/internal/sstable/bloom"
+	"github.com/thrawn01/lsm-go/internal/utils"
 )
 
 // Info contains meta information about the SSTable
@@ -24,7 +25,7 @@ type Info struct {
 	FilterLen uint64
 
 	// the codec used to compress/decompress SSTable before writing/reading from object storage
-	CompressionCodec CompressionCodec
+	CompressionCodec utils.CompressionCodec
 }
 
 func (s *Info) Clone() *Info {
@@ -78,7 +79,7 @@ type Config struct {
 	Serializer Serializer
 
 	// The codec used to compress and decompress the SSTable
-	Compression CompressionCodec
+	Compression utils.CompressionCodec
 }
 
 // Table is the in memory representation of an SSTable.

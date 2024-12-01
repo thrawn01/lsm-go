@@ -71,6 +71,7 @@ type Builder struct {
 	conf         Config
 	blockBuilder *block.Builder
 	blocks       []*block.Block
+	encodedSizes []int
 	bloomBuilder *bloom.Builder
 	keyCount     int
 	firstKey     []byte
@@ -99,7 +100,12 @@ func (bu *Builder) Add(key, value []byte) error {
 		if err != nil {
 			return err
 		}
+		encodedBlock, err := block.Encode(blk, bu.conf.Compression)
+		if err != nil {
+			return err
+		}
 		bu.blocks = append(bu.blocks, blk)
+		bu.encodedSizes = append(bu.encodedSizes, len(encodedBlock))
 		bu.blockBuilder = block.NewBuilder(uint64(bu.conf.BlockSize))
 		bu.blockBuilder.Add(key, value)
 	}
@@ -116,7 +122,9 @@ func (bu *Builder) Build() *Table {
 	// Finalize the last block if it's not empty
 	if !bu.blockBuilder.IsEmpty() {
 		blk, _ := bu.blockBuilder.Build()
+		encodedBlock, _ := block.Encode(blk, bu.conf.Compression)
 		bu.blocks = append(bu.blocks, blk)
+		bu.encodedSizes = append(bu.encodedSizes, len(encodedBlock))
 	}
 
 	var bloomFilter *bloom.Filter
@@ -155,7 +163,7 @@ func (bu *Builder) buildIndex() *Index {
 	var blockMetaOffsets []flatbuffers.UOffsetT
 
 	offset := uint64(0)
-	for _, b := range bu.blocks {
+	for i, b := range bu.blocks {
 		firstKey := b.FirstKey()
 
 		flatbuf.BlockMetaStart(builder)
@@ -164,7 +172,7 @@ func (bu *Builder) buildIndex() *Index {
 		blockMetaOffset := flatbuf.BlockMetaEnd(builder)
 		blockMetaOffsets = append(blockMetaOffsets, blockMetaOffset)
 
-		offset += uint64(len(block.Encode(b)))
+		offset += uint64(bu.encodedSizes[i])
 	}
 
 	flatbuf.SsTableIndexStartBlockMetaVector(builder, len(blockMetaOffsets))
@@ -189,7 +197,11 @@ func (bu *Builder) encode(bloomFilter *bloom.Filter, index *Index) []byte {
 
 	// Encode blocks
 	for _, b := range bu.blocks {
-		data = append(data, block.Encode(b)...)
+		d, err := block.Encode(b, bu.conf.Compression)
+		if err != nil {
+			return nil
+		}
+		data = append(data, d...)
 	}
 
 	// Encode bloom filter if present

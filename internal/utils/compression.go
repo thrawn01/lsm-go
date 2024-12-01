@@ -19,6 +19,8 @@ const (
 	CompressionZstd
 )
 
+// TODO: Consider renaming utils to codec
+
 type CompressionCodec int8
 
 // String converts CompressionCodec to string

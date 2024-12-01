@@ -185,22 +185,25 @@ func Decode(b *Block, bytes []byte, codec utils.CompressionCodec) error {
 		return ErrChecksumFailed
 	}
 
-	bytes, err := utils.Decompress(bytes[:dataLen], codec)
+	// Decompress the data (excluding the checksum)
+	uncompressed, err := utils.Decompress(bytes[:dataLen], codec)
 	if err != nil {
 		return err
 	}
 
-	// The last 2 bytes hold the offset count
-	offsetCount := binary.BigEndian.Uint16(bytes[len(bytes)-2:])
-	offsetStartIndex := int(offsetCount) * types.SizeOfUint16
+	// The last 2 bytes of the decompressed data hold the offset count
+	offset := len(uncompressed) - 2
+	offsetCount := binary.BigEndian.Uint16(uncompressed[offset:])
+
+	offsetStartIndex := offset - (int(offsetCount) * types.SizeOfUint16)
 	offsets := make([]uint16, 0, offsetCount)
 
 	for i := 0; i < int(offsetCount); i++ {
 		index := offsetStartIndex + (i * types.SizeOfUint16)
-		offsets = append(offsets, binary.BigEndian.Uint16(bytes[index:]))
+		offsets = append(offsets, binary.BigEndian.Uint16(uncompressed[index:]))
 	}
 
-	b.Data = bytes[:offsetStartIndex]
+	b.Data = uncompressed[:offsetStartIndex]
 	b.Offsets = offsets
 
 	return nil
