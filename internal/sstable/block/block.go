@@ -5,17 +5,13 @@ import (
 	"errors"
 	"github.com/thrawn01/lsm-go/internal/assert"
 	"github.com/thrawn01/lsm-go/internal/sstable/types"
+	"github.com/thrawn01/lsm-go/internal/utils"
 	"hash/crc32"
-	"math"
 )
 
 var (
 	ErrEmptyBlock     = errors.New("empty block")
 	ErrChecksumFailed = errors.New("block checksum failed")
-)
-
-const (
-	Tombstone = math.MaxUint32
 )
 
 type Block struct {
@@ -109,7 +105,7 @@ func (b *Builder) Add(key []byte, value []byte) bool {
 		b.data = binary.BigEndian.AppendUint32(b.data, uint32(valueLen))
 		b.data = append(b.data, value...)
 	} else {
-		b.data = binary.BigEndian.AppendUint32(b.data, Tombstone)
+		b.data = binary.BigEndian.AppendUint32(b.data, types.Tombstone)
 	}
 	return true
 }
@@ -155,7 +151,7 @@ func (b *Builder) Build() (*Block, error) {
 // |  |  CRC32 Checksum (4 bytes)               |  |
 // |  +-----------------------------------------+  |
 // +-----------------------------------------------+
-func Encode(b *Block) []byte {
+func Encode(b *Block, codec utils.CompressionCodec) ([]byte, error) {
 	bufSize := len(b.Data) + len(b.Offsets)*types.SizeOfUint16 + types.SizeOfUint16 + 4 // +4 for CRC32
 
 	buf := make([]byte, 0, bufSize)
@@ -167,15 +163,20 @@ func Encode(b *Block) []byte {
 
 	buf = binary.BigEndian.AppendUint16(buf, uint16(len(b.Offsets)))
 
+	var err error
+	buf, err = utils.Compress(buf, codec)
+	if err != nil {
+		return nil, err
+	}
+
 	// Calculate CRC32 checksum
 	checksum := crc32.ChecksumIEEE(buf)
 	buf = binary.BigEndian.AppendUint32(buf, checksum)
-
-	return buf
+	return buf, nil
 }
 
 // Decode converts the encoded byte slice into the provided Block
-func Decode(b *Block, bytes []byte) error {
+func Decode(b *Block, bytes []byte, codec utils.CompressionCodec) error {
 	assert.True(len(bytes) > 6, "invalid block; block is too small; must be at least 6 bytes")
 
 	// Extract and verify checksum
@@ -184,11 +185,14 @@ func Decode(b *Block, bytes []byte) error {
 		return ErrChecksumFailed
 	}
 
-	// The last 6 bytes hold the offset count (2 bytes) and CRC32 (4 bytes)
-	offset := dataLen - 2
-	offsetCount := binary.BigEndian.Uint16(bytes[offset:dataLen])
+	bytes, err := utils.Decompress(bytes[:dataLen], codec)
+	if err != nil {
+		return err
+	}
 
-	offsetStartIndex := offset - (int(offsetCount) * types.SizeOfUint16)
+	// The last 2 bytes hold the offset count
+	offsetCount := binary.BigEndian.Uint16(bytes[len(bytes)-2:])
+	offsetStartIndex := int(offsetCount) * types.SizeOfUint16
 	offsets := make([]uint16, 0, offsetCount)
 
 	for i := 0; i < int(offsetCount); i++ {

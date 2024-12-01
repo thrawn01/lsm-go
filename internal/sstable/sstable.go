@@ -5,16 +5,6 @@ import (
 	"github.com/thrawn01/lsm-go/internal/sstable/bloom"
 )
 
-type CompressionCodec int8
-
-const (
-	CompressionNone CompressionCodec = iota
-	CompressionSnappy
-	CompressionZlib
-	CompressionLz4
-	CompressionZstd
-)
-
 // Info contains meta information about the SSTable
 type Info struct {
 	// contains the FirstKey of the SSTable

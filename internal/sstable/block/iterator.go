@@ -73,7 +73,7 @@ func (iter *Iterator) NextEntry() (types.KeyValue, bool) {
 	valueLen := binary.BigEndian.Uint32(data[offset:])
 	offset += types.SizeOfUint32
 
-	if valueLen != Tombstone {
+	if valueLen != types.Tombstone {
 		result.Value = types.Value{
 			Value:       data[offset : uint32(offset)+valueLen],
 			IsTombstone: false,
