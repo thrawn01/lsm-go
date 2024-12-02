@@ -16,12 +16,12 @@ The goal is to
 - Or Have the AI suggest ways to fix the implementation
 - If that fails, then I just ask the AI to borrow SlateDB implementation and adapt it to the new interface
 
-## Results so far
+## Results
 
 ### Block Package
-I didn't completely grok that I should write documentation about how the blocks should be laid out on
-disk in order for the AI to properly implement this portion. So, instead I had the AI adapt the code from
-slateDB.
+As this is the first thing I asked the AI to build, I didn't completely grok that I should write detailed
+documentation about how the blocks should be laid out on disk in order for the AI to properly implement
+this portion. So, instead I had the AI adapt the code from [slatedb-go](https://github.com/slatedb/slatedb-go).
 
 ### Bloom Package
 The AI implemented a complete bloom filter package, however it ignored the request to 
@@ -53,7 +53,27 @@ this the method passed the provided test.
 The AI implemented both `ReadIndex()` and `ReadIndexFromBytes()` perfectly, even including negative and
 positive tests.
 
-## What I learned
+#### ReadBlocks()
+I had to `/ask` the AI to describe how it would implement the method several times. Each time I had to 
+add more `//TODO` comments to the method and update the method comment before it finally gave me what I wanted.
+The AI wanted to make multiple calls to the read only blob in order to fetch each block individually.
+This was suboptimal as we have no idea if the ReadOnlyBlob implementation is making remote calls to fetch
+the offsets, so I had to spell out exactly what I wanted in the TODOs before it would do it.
+
+Once that was done, the AI wrote the code perfectly. The only change I needed to make was in the tests,
+as the AI didn't realize that multiple blocks would not result unless the keys exceeded the block size.
+
+# What I've learned
+In all, using the AI made me really think hard about how I would explain what I wanted. The advantage of
+this is that the code gets better documentation than it normally would if I was writing the implementation
+as I know what I want, and don't have to describe it to anyone. This way, the code gets documented and 
+I end up moving faster than I normally would. 
+
+The other thing I considered is that I might be able to ask a newer AI model to re-write a method to 
+improve it, or make it more efficient. The excellent documentation that results due to process assists
+future developers and AI as the documentation clearly spells out what the code "should" be doing and why.
+
+I don't think I could have gotten this far with as little time as I've invested in this without the AI.
 
 ##### Provide exact instructions in the method comments
 When designing the methods and functions you want the AI to implement, explicitly state what and how the 
@@ -70,7 +90,8 @@ func (d *Decoder) ReadBloom(info *Info, b ReadOnlyBlob) (*bloom.Filter, error) {
 ```
 Prompt:
 ```
-Provide an implementation of sstable.Decoder.ReadBloom() using the same error verbage as ReadInfo().
+Provide an implementation of sstable.Decoder.ReadBloom() using
+ the same error verbage as ReadInfo().
 ```
 
 ##### Add TODOs to complex methods for the AI to follow
@@ -94,6 +115,15 @@ func (bu *Builder) Build() *Table {
 
     // TODO: Append the info offset as a uint32
 }
-
 ```
 
+##### For complex methods, Ask the AI to explain first
+Use the `/ask` command in aider to ask how the AI would implement a method. This avoids having the AI make
+changes the FIX those changes it got wrong because it didn't understand your requirements.
+
+Often times I will make several `/ask` follow-ups after adding `//TODO` or improving the method comment until
+it understands what the method is supposed todo.
+
+###### Git Add before asking the AI to make changes
+Run aider with `auto-commits: false` and commit your changes before asking the AI to make code changes. This 
+allows you to quickly roll back if the AI gets it really wrong.

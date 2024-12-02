@@ -1,7 +1,9 @@
 package sstable
 
 import (
+	"github.com/kapetan-io/tackle/random"
 	"github.com/stretchr/testify/assert"
+	"github.com/thrawn01/lsm-go/internal/sstable/block"
 	"github.com/thrawn01/lsm-go/internal/utils"
 	"testing"
 )
@@ -167,6 +169,76 @@ func TestDecoder_ReadIndex(t *testing.T) {
 	assert.NotNil(t, firstBlock)
 	assert.Greater(t, firstBlock.Offset, uint64(0))
 	assert.Equal(t, []byte("key1"), firstBlock.FirstKey)
+}
+
+func TestDecoder_ReadBlocks(t *testing.T) {
+	// Create a sample SSTable using the Builder
+	builder := NewBuilder(Config{
+		BlockSize:        30,
+		MinFilterKeys:    2,
+		FilterBitsPerKey: 10,
+		Compression:      utils.CompressionNone,
+	})
+
+	// Each key will be in its own block as each key exceeds the max block size of 30
+	value1 := []byte(random.Alpha("", 30))
+	assert.NoError(t, builder.Add([]byte("key1"), value1))
+	assert.NoError(t, builder.Add([]byte("key2"), []byte(random.Alpha("", 30))))
+	assert.NoError(t, builder.Add([]byte("key3"), []byte(random.Alpha("", 30))))
+	assert.NoError(t, builder.Add([]byte("key4"), []byte(random.Alpha("", 30))))
+	assert.NoError(t, builder.Add([]byte("key5"), []byte(random.Alpha("", 30))))
+
+	// Build the SSTable
+	table := builder.Build()
+
+	// Create a mock blob with the SSTable data
+	blob := &mockBlob{data: table.Data}
+
+	// Create a decoder
+	decoder := &Decoder{
+		Config: Config{
+			BlockSize:        30,
+			MinFilterKeys:    2,
+			FilterBitsPerKey: 10,
+			Compression:      utils.CompressionNone,
+		},
+	}
+
+	// Read the Info using the decoder
+	info, err := decoder.ReadInfo(blob)
+	assert.NoError(t, err)
+	assert.NotNil(t, info)
+
+	// Read the Index using the decoder
+	index, err := decoder.ReadIndex(info, blob)
+	assert.NoError(t, err)
+	assert.NotNil(t, index)
+
+	// Test reading all blocks
+	blocks, err := decoder.ReadBlocks(info, index, Range{Start: 0, End: uint64(len(index.AsFlatBuf().BlockMeta))}, blob)
+	assert.NoError(t, err)
+	assert.Equal(t, len(index.AsFlatBuf().BlockMeta), len(blocks))
+
+	// Test reading a subset of blocks
+	blocks, err = decoder.ReadBlocks(info, index, Range{Start: 1, End: 3}, blob)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(blocks))
+
+	// Test invalid range
+	_, err = decoder.ReadBlocks(info, index, Range{Start: 10, End: 20}, blob)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid block range")
+
+	// Test reading and decoding block content
+	blocks, err = decoder.ReadBlocks(info, index, Range{Start: 0, End: 1}, blob)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(blocks))
+
+	iter := block.NewIterator(&blocks[0])
+	kv, ok := iter.Next()
+	assert.True(t, ok)
+	assert.Equal(t, []byte("key1"), kv.Key)
+	assert.Equal(t, value1, kv.Value)
 }
 
 func TestDecoder_ReadIndexFromBytes(t *testing.T) {

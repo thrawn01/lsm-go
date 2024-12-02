@@ -3,6 +3,7 @@ package sstable
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/thrawn01/lsm-go/internal/sstable/block"
 	"github.com/thrawn01/lsm-go/internal/sstable/bloom"
 	"github.com/thrawn01/lsm-go/internal/sstable/types"
 )
@@ -125,9 +126,53 @@ func (d *Decoder) ReadIndexFromBytes(info *Info, buf []byte) (*Index, error) {
 	return index, nil
 }
 
-// ReadBlocks
-func (d *Decoder) ReadBlocks(info *Info, idx *Index, r Range, b ReadOnlyBlob) (*Index, error) {
-	return nil, nil // TODO
+// ReadBlocks reads a range of blocks. The range of blocks provided by Range is not a range of offsets, instead
+// it is a range index blocks defined in flatbuf.SsTableIndexT.BlockMeta. Example: To retrieve the first
+// block in the provided blob the range would be Range{Start: 0, End: 1}. ReadBlocks then uses the Index
+// to locate the offsets in the blob decoding each block and returning them.
+func (d *Decoder) ReadBlocks(info *Info, idx *Index, r Range, b ReadOnlyBlob) ([]block.Block, error) {
+	// Decode the index
+	indexT := idx.AsFlatBuf()
+
+	// Validate the range
+	if r.Start >= uint64(len(indexT.BlockMeta)) || r.End > uint64(len(indexT.BlockMeta)) || r.Start >= r.End {
+		return nil, fmt.Errorf("invalid block range: start=%d, end=%d, total blocks=%d", r.Start, r.End, len(indexT.BlockMeta))
+	}
+
+	// Calculate the start and end offsets for the range of blocks
+	startOffset := uint64(0)
+	if r.Start > 0 {
+		startOffset = indexT.BlockMeta[r.Start-1].Offset
+	}
+	endOffset := indexT.BlockMeta[r.End-1].Offset
+
+	// Read all the block data in one call
+	blockData, err := b.ReadRange(Range{Start: startOffset, End: endOffset})
+	if err != nil {
+		return nil, fmt.Errorf("error reading blocks: %w", err)
+	}
+
+	blocks := make([]block.Block, 0, r.End-r.Start)
+
+	// Decode each block
+	for i := r.Start; i < r.End; i++ {
+		start := uint64(0)
+		if i > r.Start {
+			start = indexT.BlockMeta[i-1].Offset - startOffset
+		}
+		end := indexT.BlockMeta[i].Offset - startOffset
+
+		var blk block.Block
+		err = block.Decode(&blk, blockData[start:end], info.CompressionCodec)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding block %d: %w", i, err)
+		}
+
+		blk.Meta = *indexT.BlockMeta[i]
+		blocks = append(blocks, blk)
+	}
+
+	return blocks, nil
 }
 
 // validInfo returns nil if Info offsets and lengths are less than the total
