@@ -53,15 +53,13 @@ type Range struct {
 }
 
 type ReadOnlyBlob interface {
-	Len() (int, error)
+	Len() (uint64, error)
+
+	// TODO: ReadRange should protect against reading ranges outside of it's bounds
+
 	ReadRange(r Range) ([]byte, error)
 	Read() ([]byte, error)
-}
-
-// Serializer provides optional implementations for encoding and decoding SSTableInfo
-type Serializer interface {
-	Encode(info *Info) []byte
-	Decode(data []byte) *Info
+	Id() string
 }
 
 type Config struct {
@@ -75,10 +73,9 @@ type Config struct {
 
 	FilterBitsPerKey int
 
-	// The Serializer used to encode and decode sstable.Info from the SSTable.
-	Serializer Serializer
-
-	// The codec used to compress and decompress the SSTable
+	// The codec used to compress new SSTables. The compression codec used in
+	// existing SSTables already written disk is encoded into the SSTableInfo and
+	// will be used when decompressing the blocks in that SSTable.
 	Compression utils.CompressionCodec
 }
 

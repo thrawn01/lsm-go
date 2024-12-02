@@ -43,3 +43,8 @@ the AI wrote a few prompts ago. I also had to come up with a way of storing the 
 the AI understood that calling `block.Encode()` everytime it needed an offset wasn't an efficient way 
 to solve the problem.
 
+#### ReadInfo()
+The AI implemented the method incorrectly, after a few attempts and diagnosis, I realized the AI wrote the
+final SSTable offset as an `uint64` instead of a `uint32` which caused an out-of-bounds error. Once I fixed 
+this the method passed the provided test.
+

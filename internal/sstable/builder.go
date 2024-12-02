@@ -73,7 +73,6 @@ type Builder struct {
 	bloomBuilder *bloom.Builder
 	keyCount     int
 	firstKey     []byte
-	lastKey      []byte
 }
 
 // NewBuilder creates a new builder used to encode an SSTable
@@ -106,8 +105,6 @@ func (bu *Builder) Add(key, value []byte) error {
 
 	bu.bloomBuilder.Add(key)
 	bu.keyCount++
-	bu.lastKey = make([]byte, len(key))
-	copy(bu.lastKey, key)
 
 	return nil
 }
@@ -167,11 +164,11 @@ func (bu *Builder) Build() *Table {
 	}
 
 	infoBytes := encodeInfo(info)
-	infoOffset := uint64(len(data))
+	infoOffset := uint32(len(data))
 	data = append(data, infoBytes...)
 
 	// Append the offset of Info at the end
-	data = binary.BigEndian.AppendUint64(data, infoOffset)
+	data = binary.BigEndian.AppendUint32(data, infoOffset)
 
 	return &Table{
 		Info:  info,
