@@ -25,7 +25,7 @@ func (d *Decoder) ReadInfo(b ReadOnlyBlob) (*Info, error) {
 	// Read the last 8 bytes to get the offset of the Info
 	offsetBytes, err := b.ReadRange(Range{Start: size - types.SizeOfUint32, End: size})
 	if err != nil {
-		return nil, fmt.Errorf("failed to read Info offset: %w", err)
+		return nil, fmt.Errorf("while reading offset %d ReadRange(): %w", size-types.SizeOfUint32, err)
 	}
 
 	if len(offsetBytes) != types.SizeOfUint32 {
@@ -56,21 +56,76 @@ func (d *Decoder) ReadInfo(b ReadOnlyBlob) (*Info, error) {
 // ReadBloom reads the bloom.Filter from the provided store using blob.ReadRange()
 // using the offsets provided by Info.
 func (d *Decoder) ReadBloom(info *Info, b ReadOnlyBlob) (*bloom.Filter, error) {
-	return nil, nil // TODO
+	// Check if there's a bloom filter
+	if info.FilterLen == 0 {
+		return nil, nil
+	}
+
+	// Read the bloom filter data
+	filterBytes, err := b.ReadRange(Range{
+		Start: info.FilterOffset,
+		End:   info.FilterOffset + info.FilterLen,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("while reading bloom filter with ReadRange(): %w", err)
+	}
+
+	// Decode the bloom filter
+	filter := bloom.Decode(filterBytes)
+
+	return filter, nil
 }
 
 // ReadIndex reads the Index from the provided store using blob.ReadRange()
 // using the offsets provided by Info.
 func (d *Decoder) ReadIndex(info *Info, b ReadOnlyBlob) (*Index, error) {
-	return nil, nil // TODO
+	// Check if there's an index
+	if info.IndexLen == 0 {
+		return nil, nil
+	}
+
+	// Read the index data
+	indexBytes, err := b.ReadRange(Range{
+		Start: info.IndexOffset,
+		End:   info.IndexOffset + info.IndexLen,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("while reading index with ReadRange(): %w", err)
+	}
+
+	// Decode the index
+	index := &Index{
+		Data: indexBytes,
+	}
+
+	return index, nil
 }
 
 // ReadIndexFromBytes is identical to ReadIndex except it reads the index from the provided
 // byte slice.
 func (d *Decoder) ReadIndexFromBytes(info *Info, buf []byte) (*Index, error) {
-	return nil, nil // TODO
+	// Check if there's an index
+	if info.IndexLen == 0 {
+		return nil, nil
+	}
+
+	// Check if the buffer contains enough data
+	if uint64(len(buf)) < info.IndexLen {
+		return nil, fmt.Errorf("insufficient data: expected %d bytes, got %d", info.IndexLen, len(buf))
+	}
+
+	// Extract the index data
+	indexBytes := buf[:info.IndexLen]
+
+	// Decode the index
+	index := &Index{
+		Data: indexBytes,
+	}
+
+	return index, nil
 }
 
+// ReadBlocks
 func (d *Decoder) ReadBlocks(info *Info, idx *Index, r Range, b ReadOnlyBlob) (*Index, error) {
 	return nil, nil // TODO
 }

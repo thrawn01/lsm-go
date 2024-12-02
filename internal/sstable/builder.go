@@ -129,11 +129,18 @@ func (bu *Builder) Build() *Table {
 			FirstKey: b.FirstKey(),
 		}
 	}
+	info := &Info{
+		FirstKey:         bu.firstKey,
+		CompressionCodec: bu.conf.Compression,
+	}
 
 	var bloomFilter *bloom.Filter
 	if bu.keyCount >= bu.conf.MinFilterKeys {
 		bloomFilter = bu.bloomBuilder.Build()
-		data = append(data, bloom.Encode(bloomFilter)...)
+		info.FilterOffset = uint64(len(data))
+		encodedFilter := bloom.Encode(bloomFilter)
+		data = append(data, encodedFilter...)
+		info.FilterLen = uint64(len(encodedFilter))
 	}
 
 	// Build the index
@@ -151,17 +158,8 @@ func (bu *Builder) Build() *Table {
 	data = append(data, indexBytes...)
 
 	// Build and Encode Info
-	info := &Info{
-		FirstKey:         bu.firstKey,
-		IndexOffset:      indexStartOffset,
-		IndexLen:         uint64(len(indexBytes)),
-		CompressionCodec: bu.conf.Compression,
-	}
-
-	if bloomFilter != nil {
-		info.FilterOffset = uint64(len(bu.blocks) * bu.conf.BlockSize)
-		info.FilterLen = uint64(len(bloomFilter.Data) + 2) // +2 for NumProbes
-	}
+	info.IndexOffset = indexStartOffset
+	info.IndexLen = uint64(len(indexBytes))
 
 	infoBytes := encodeInfo(info)
 	infoOffset := uint32(len(data))

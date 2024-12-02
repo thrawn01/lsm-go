@@ -28,7 +28,8 @@ The AI implemented a complete bloom filter package, however it ignored the reque
 `implement enhanced double hashing` which resulted in a significantly different implementation
 that what slateDB has. This is fine, but when I ran the tests, all the `HasKey()` tests failed as
 the AI wasn't able to figure out how to calculate the filter bits without a reference. I fixed this
-and the code worked, but I ended up using the slateDB implementation anyway. =/
+and the code worked, but I ended up using the slateDB implementation because I'm not a bloom filter
+expert. =/
 
 Also, the AI did a pretty good job of describing how I should go about diagnosing the bug. In
 all I spent about 1 hour on this package, which is pretty fast compared to how long it would have
@@ -47,4 +48,52 @@ to solve the problem.
 The AI implemented the method incorrectly, after a few attempts and diagnosis, I realized the AI wrote the
 final SSTable offset as an `uint64` instead of a `uint32` which caused an out-of-bounds error. Once I fixed 
 this the method passed the provided test.
+
+#### ReadIndex()
+The AI implemented both `ReadIndex()` and `ReadIndexFromBytes()` perfectly, even including negative and
+positive tests.
+
+## What I learned
+
+##### Provide exact instructions in the method comments
+When designing the methods and functions you want the AI to implement, explicitly state what and how the 
+method should operate. This gives the AI hints as to what you expect. Then when prompting include additional
+instructions 
+
+Example:
+```go
+// ReadBloom reads the bloom.Filter from the provided store using blob.ReadRange()
+// using the offsets provided by Info.
+func (d *Decoder) ReadBloom(info *Info, b ReadOnlyBlob) (*bloom.Filter, error) {
+    return nil, nil // TODO
+}
+```
+Prompt:
+```
+Provide an implementation of sstable.Decoder.ReadBloom() using the same error verbage as ReadInfo().
+```
+
+##### Add TODOs to complex methods for the AI to follow
+When asking the AI to implement methods which require multiple steps or utilizes different parts of the code base, I
+got better results when I added `//TODO` comments in the method. For example:
+
+```go
+// Build returns the SSTable in it's encoded form
+func (bu *Builder) Build() *Table {
+
+    // TODO: Finalize the last block if it's not empty
+
+    // TODO: Encode blocks using block.Encode()
+
+    // TODO: Build the bloom filter using bu.bloomBuilder.Build() if the number of keys
+	//  is greater than bu.conf.MinFilterKeys
+
+    // TODO: Build and encode the flatbuf.SsTableIndexT using bu.blocks[].Meta
+
+    // TODO: Build and encode sstable.Info using encodeInfo() from flatbuf.go
+
+    // TODO: Append the info offset as a uint32
+}
+
+```
 
