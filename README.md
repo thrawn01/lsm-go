@@ -75,7 +75,7 @@ future developers and AI as the documentation clearly spells out what the code "
 
 I don't think I could have gotten this far with as little time as I've invested in this without the AI.
 
-##### Provide exact instructions in the method comments
+### Provide exact instructions in the method comments
 When designing the methods and functions you want the AI to implement, explicitly state what and how the 
 method should operate. This gives the AI hints as to what you expect. Then when prompting include additional
 instructions 
@@ -94,7 +94,7 @@ Provide an implementation of sstable.Decoder.ReadBloom() using
  the same error verbage as ReadInfo().
 ```
 
-##### Add TODOs to complex methods for the AI to follow
+### Add TODOs to complex methods for the AI to follow
 When asking the AI to implement methods which require multiple steps or utilizes different parts of the code base, I
 got better results when I added `//TODO` comments in the method. For example:
 
@@ -117,13 +117,13 @@ func (bu *Builder) Build() *Table {
 }
 ```
 
-##### For complex methods, Ask the AI to explain first
+### For complex methods, Ask the AI to explain first
 Use the `/ask` command in aider to ask how the AI would implement a method. This avoids having the AI make
 changes the FIX those changes it got wrong because it didn't understand your requirements.
 
 Often times I will make several `/ask` follow-ups after adding `//TODO` or improving the method comment until
 it understands what the method is supposed todo.
 
-###### Git Add before asking the AI to make changes
+### Git Add before asking the AI to make changes
 Run aider with `auto-commits: false` and commit your changes before asking the AI to make code changes. This 
 allows you to quickly roll back if the AI gets it really wrong.
