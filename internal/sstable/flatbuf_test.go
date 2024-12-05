@@ -1,11 +1,11 @@
 package sstable
 
 import (
+	"github.com/thrawn01/lsm-go/internal/compress"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/thrawn01/lsm-go/internal/flatbuf"
-	"github.com/thrawn01/lsm-go/internal/utils"
 )
 
 // NOTE: These test private methods for correctness, feel free to remove these tests in the future.
@@ -42,7 +42,7 @@ func TestEncodeDecodeInfo(t *testing.T) {
 		IndexLen:         500,
 		FilterOffset:     1500,
 		FilterLen:        200,
-		CompressionCodec: utils.CompressionSnappy,
+		CompressionCodec: compress.CodecSnappy,
 	}
 
 	// Encode the Info
@@ -87,7 +87,7 @@ func TestInfoClone(t *testing.T) {
 		IndexLen:         500,
 		FilterOffset:     1500,
 		FilterLen:        200,
-		CompressionCodec: utils.CompressionSnappy,
+		CompressionCodec: compress.CodecSnappy,
 	}
 
 	// Clone the Info

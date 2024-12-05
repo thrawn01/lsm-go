@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"github.com/thrawn01/lsm-go/internal/assert"
+	"github.com/thrawn01/lsm-go/internal/compress"
 	"github.com/thrawn01/lsm-go/internal/flatbuf"
 	"github.com/thrawn01/lsm-go/internal/sstable/types"
-	"github.com/thrawn01/lsm-go/internal/utils"
 	"hash/crc32"
 )
 
@@ -153,7 +153,7 @@ func (b *Builder) Build() (*Block, error) {
 // |  |  CRC32 Checksum (4 bytes)               |  |
 // |  +-----------------------------------------+  |
 // +-----------------------------------------------+
-func Encode(b *Block, codec utils.CompressionCodec) ([]byte, error) {
+func Encode(b *Block, codec compress.Codec) ([]byte, error) {
 	bufSize := len(b.Data) + len(b.Offsets)*types.SizeOfUint16 + types.SizeOfUint16 + 4 // +4 for CRC32
 
 	buf := make([]byte, 0, bufSize)
@@ -166,7 +166,7 @@ func Encode(b *Block, codec utils.CompressionCodec) ([]byte, error) {
 	buf = binary.BigEndian.AppendUint16(buf, uint16(len(b.Offsets)))
 
 	var err error
-	buf, err = utils.Compress(buf, codec)
+	buf, err = compress.Encode(buf, codec)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func Encode(b *Block, codec utils.CompressionCodec) ([]byte, error) {
 }
 
 // Decode converts the encoded byte slice into the provided Block
-func Decode(b *Block, bytes []byte, codec utils.CompressionCodec) error {
+func Decode(b *Block, bytes []byte, codec compress.Codec) error {
 	assert.True(len(bytes) > 6, "invalid block; block is too small; must be at least 6 bytes")
 
 	// Extract and verify checksum
@@ -188,7 +188,7 @@ func Decode(b *Block, bytes []byte, codec utils.CompressionCodec) error {
 	}
 
 	// Decompress the data (excluding the checksum)
-	uncompressed, err := utils.Decompress(bytes[:dataLen], codec)
+	uncompressed, err := compress.Decode(bytes[:dataLen], codec)
 	if err != nil {
 		return err
 	}

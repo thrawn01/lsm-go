@@ -1,4 +1,4 @@
-package utils
+package compress
 
 import (
 	"bytes"
@@ -12,47 +12,45 @@ import (
 )
 
 const (
-	CompressionNone CompressionCodec = iota
-	CompressionSnappy
-	CompressionZlib
-	CompressionLz4
-	CompressionZstd
+	CodecNone Codec = iota
+	CodecSnappy
+	CodecZlib
+	CodecLz4
+	CodecZstd
 )
 
-// TODO: Consider renaming utils to codec
+type Codec int8
 
-type CompressionCodec int8
-
-// String converts CompressionCodec to string
-func (c CompressionCodec) String() string {
+// String converts Codec to string
+func (c Codec) String() string {
 	switch c {
-	case CompressionNone:
+	case CodecNone:
 		return "None"
-	case CompressionSnappy:
+	case CodecSnappy:
 		return "Snappy"
-	case CompressionZlib:
+	case CodecZlib:
 		return "Zlib"
-	case CompressionLz4:
+	case CodecLz4:
 		return "LZ4"
-	case CompressionZstd:
+	case CodecZstd:
 		return "Zstd"
 	default:
 		return "Unknown"
 	}
 }
 
-var ErrInvalidCompressionCodec = errors.New("invalid compression codec")
+var ErrInvalidCodec = errors.New("invalid compression codec")
 
-// Compress the provided byte slice
-func Compress(buf []byte, codec CompressionCodec) ([]byte, error) {
+// Encode the provided byte slice
+func Encode(buf []byte, codec Codec) ([]byte, error) {
 	switch codec {
-	case CompressionNone:
+	case CodecNone:
 		return buf, nil
 
-	case CompressionSnappy:
+	case CodecSnappy:
 		return snappy.Encode(nil, buf), nil
 
-	case CompressionZlib:
+	case CodecZlib:
 		var b bytes.Buffer
 		w := zlib.NewWriter(&b)
 		_, err := w.Write(buf)
@@ -62,7 +60,7 @@ func Compress(buf []byte, codec CompressionCodec) ([]byte, error) {
 		}
 		return b.Bytes(), nil
 
-	case CompressionLz4:
+	case CodecLz4:
 		var b bytes.Buffer
 		w := lz4.NewWriter(&b)
 		_, err := w.Write(buf)
@@ -72,7 +70,7 @@ func Compress(buf []byte, codec CompressionCodec) ([]byte, error) {
 		}
 		return b.Bytes(), nil
 
-	case CompressionZstd:
+	case CodecZstd:
 		var b bytes.Buffer
 		w, err := zstd.NewWriter(&b)
 		if err != nil {
@@ -85,20 +83,20 @@ func Compress(buf []byte, codec CompressionCodec) ([]byte, error) {
 		}
 		return b.Bytes(), nil
 	default:
-		return nil, ErrInvalidCompressionCodec
+		return nil, ErrInvalidCodec
 	}
 }
 
-// Decompress the provided byte slice according to the compression codec
-func Decompress(buf []byte, codec CompressionCodec) ([]byte, error) {
+// Decode the provided byte slice according to the compression codec
+func Decode(buf []byte, codec Codec) ([]byte, error) {
 	switch codec {
-	case CompressionNone:
+	case CodecNone:
 		return buf, nil
 
-	case CompressionSnappy:
+	case CodecSnappy:
 		return snappy.Decode(nil, buf)
 
-	case CompressionZlib:
+	case CodecZlib:
 		r, err := zlib.NewReader(bytes.NewReader(buf))
 		if err != nil {
 			return nil, err
@@ -106,11 +104,11 @@ func Decompress(buf []byte, codec CompressionCodec) ([]byte, error) {
 		defer func() { _ = r.Close() }()
 		return io.ReadAll(r)
 
-	case CompressionLz4:
+	case CodecLz4:
 		r := lz4.NewReader(bytes.NewReader(buf))
 		return io.ReadAll(r)
 
-	case CompressionZstd:
+	case CodecZstd:
 		r, err := zstd.NewReader(bytes.NewReader(buf))
 		if err != nil {
 			return nil, err
@@ -119,6 +117,6 @@ func Decompress(buf []byte, codec CompressionCodec) ([]byte, error) {
 		return io.ReadAll(r)
 
 	default:
-		return nil, ErrInvalidCompressionCodec
+		return nil, ErrInvalidCodec
 	}
 }

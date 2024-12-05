@@ -3,9 +3,9 @@ package block_test
 import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
+	"github.com/thrawn01/lsm-go/internal/compress"
 	"github.com/thrawn01/lsm-go/internal/sstable/block"
 	"github.com/thrawn01/lsm-go/internal/sstable/types"
-	"github.com/thrawn01/lsm-go/internal/utils"
 	"testing"
 )
 
@@ -19,10 +19,10 @@ func TestNewBuilder(t *testing.T) {
 	b, err := bb.Build()
 	assert.NoError(t, err)
 
-	encoded, err := block.Encode(b, utils.CompressionNone)
+	encoded, err := block.Encode(b, compress.CodecNone)
 	assert.NoError(t, err)
 	var decoded block.Block
-	assert.NoError(t, block.Decode(&decoded, encoded, utils.CompressionNone))
+	assert.NoError(t, block.Decode(&decoded, encoded, compress.CodecNone))
 	assert.Equal(t, b.Data, decoded.Data)
 	assert.Equal(t, b.Offsets, decoded.Offsets)
 }
@@ -35,12 +35,12 @@ func TestBlockChecksumVerification(t *testing.T) {
 	b, err := bb.Build()
 	assert.NoError(t, err)
 
-	encoded, err := block.Encode(b, utils.CompressionNone)
+	encoded, err := block.Encode(b, compress.CodecNone)
 	assert.NoError(t, err)
 
 	// Test successful decoding
 	var decoded block.Block
-	err = block.Decode(&decoded, encoded, utils.CompressionNone)
+	err = block.Decode(&decoded, encoded, compress.CodecNone)
 	assert.NoError(t, err)
 	assert.Equal(t, b.Data, decoded.Data)
 	assert.Equal(t, b.Offsets, decoded.Offsets)
@@ -49,7 +49,7 @@ func TestBlockChecksumVerification(t *testing.T) {
 	encoded[0] ^= 0xFF
 
 	// Test failed decoding due to checksum mismatch
-	err = block.Decode(&decoded, encoded, utils.CompressionNone)
+	err = block.Decode(&decoded, encoded, compress.CodecNone)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "block checksum failed")
 }
@@ -63,10 +63,10 @@ func TestBlockWithTombstone(t *testing.T) {
 	b, err := bb.Build()
 	assert.NoError(t, err)
 
-	encoded, err := block.Encode(b, utils.CompressionNone)
+	encoded, err := block.Encode(b, compress.CodecNone)
 	assert.NoError(t, err)
 	var decoded block.Block
-	err = block.Decode(&decoded, encoded, utils.CompressionNone)
+	err = block.Decode(&decoded, encoded, compress.CodecNone)
 	assert.NoError(t, err)
 	assert.Equal(t, b.Data, decoded.Data)
 	assert.Equal(t, b.Offsets, decoded.Offsets)
@@ -151,7 +151,7 @@ func TestNewIteratorAtKey(t *testing.T) {
 	})
 }
 
-func testCompression(t *testing.T, codec utils.CompressionCodec) {
+func testCompression(t *testing.T, codec compress.Codec) {
 	t.Helper()
 	bb := block.NewBuilder(4096)
 	assert.True(t, bb.Add([]byte("key1"), []byte("value1")))
@@ -171,12 +171,12 @@ func testCompression(t *testing.T, codec utils.CompressionCodec) {
 }
 
 func TestCompressionMethods(t *testing.T) {
-	codecs := []utils.CompressionCodec{
-		utils.CompressionNone,
-		utils.CompressionSnappy,
-		utils.CompressionZlib,
-		utils.CompressionLz4,
-		utils.CompressionZstd,
+	codecs := []compress.Codec{
+		compress.CodecNone,
+		compress.CodecSnappy,
+		compress.CodecZlib,
+		compress.CodecLz4,
+		compress.CodecZstd,
 	}
 
 	for _, codec := range codecs {

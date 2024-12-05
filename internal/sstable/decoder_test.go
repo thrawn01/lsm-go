@@ -3,8 +3,8 @@ package sstable
 import (
 	"github.com/kapetan-io/tackle/random"
 	"github.com/stretchr/testify/assert"
+	"github.com/thrawn01/lsm-go/internal/compress"
 	"github.com/thrawn01/lsm-go/internal/sstable/block"
-	"github.com/thrawn01/lsm-go/internal/utils"
 	"testing"
 )
 
@@ -34,7 +34,7 @@ func TestDecoder_ReadInfo(t *testing.T) {
 		BlockSize:        1024,
 		MinFilterKeys:    10,
 		FilterBitsPerKey: 10,
-		Compression:      utils.CompressionNone,
+		Compression:      compress.CodecNone,
 	})
 
 	// Add some sample data
@@ -54,7 +54,7 @@ func TestDecoder_ReadInfo(t *testing.T) {
 			BlockSize:        1024,
 			MinFilterKeys:    10,
 			FilterBitsPerKey: 10,
-			Compression:      utils.CompressionNone,
+			Compression:      compress.CodecNone,
 		},
 	}
 
@@ -78,7 +78,7 @@ func TestDecoder_ReadBloom(t *testing.T) {
 		BlockSize:        1024,
 		MinFilterKeys:    2, // Set this to a small number to ensure a bloom filter is created
 		FilterBitsPerKey: 10,
-		Compression:      utils.CompressionNone,
+		Compression:      compress.CodecNone,
 	})
 
 	// Add some sample data
@@ -98,7 +98,7 @@ func TestDecoder_ReadBloom(t *testing.T) {
 			BlockSize:        1024,
 			MinFilterKeys:    2,
 			FilterBitsPerKey: 10,
-			Compression:      utils.CompressionNone,
+			Compression:      compress.CodecNone,
 		},
 	}
 
@@ -125,7 +125,7 @@ func TestDecoder_ReadIndex(t *testing.T) {
 		BlockSize:        1024,
 		MinFilterKeys:    2,
 		FilterBitsPerKey: 10,
-		Compression:      utils.CompressionNone,
+		Compression:      compress.CodecNone,
 	})
 
 	// Add some sample data
@@ -145,7 +145,7 @@ func TestDecoder_ReadIndex(t *testing.T) {
 			BlockSize:        1024,
 			MinFilterKeys:    2,
 			FilterBitsPerKey: 10,
-			Compression:      utils.CompressionNone,
+			Compression:      compress.CodecNone,
 		},
 	}
 
@@ -177,7 +177,7 @@ func TestDecoder_ReadBlocks(t *testing.T) {
 		BlockSize:        30,
 		MinFilterKeys:    2,
 		FilterBitsPerKey: 10,
-		Compression:      utils.CompressionNone,
+		Compression:      compress.CodecNone,
 	})
 
 	// Each key will be in its own block as each key exceeds the max block size of 30
@@ -200,7 +200,7 @@ func TestDecoder_ReadBlocks(t *testing.T) {
 			BlockSize:        30,
 			MinFilterKeys:    2,
 			FilterBitsPerKey: 10,
-			Compression:      utils.CompressionNone,
+			Compression:      compress.CodecNone,
 		},
 	}
 
@@ -247,7 +247,7 @@ func TestDecoder_ReadIndexFromBytes(t *testing.T) {
 		BlockSize:        1024,
 		MinFilterKeys:    2,
 		FilterBitsPerKey: 10,
-		Compression:      utils.CompressionNone,
+		Compression:      compress.CodecNone,
 	})
 
 	// Add some sample data
@@ -264,7 +264,7 @@ func TestDecoder_ReadIndexFromBytes(t *testing.T) {
 			BlockSize:        1024,
 			MinFilterKeys:    2,
 			FilterBitsPerKey: 10,
-			Compression:      utils.CompressionNone,
+			Compression:      compress.CodecNone,
 		},
 	}
 

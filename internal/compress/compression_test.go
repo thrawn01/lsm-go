@@ -1,4 +1,4 @@
-package utils
+package compress
 
 import (
 	"bytes"
@@ -11,24 +11,24 @@ import (
 func TestCompressDecompress(t *testing.T) {
 	testCases := []struct {
 		name   string
-		codec  CompressionCodec
+		codec  Codec
 		input  []byte
 		errMsg string
 	}{
-		{"None", CompressionNone, []byte("Hello, World!"), ""},
-		{"Snappy", CompressionSnappy, []byte("Snappy compression test"), ""},
-		{"Zlib", CompressionZlib, []byte("Zlib compression test"), ""},
-		{"LZ4", CompressionLz4, []byte("LZ4 compression test"), ""},
-		{"Zstd", CompressionZstd, []byte("Zstd compression test"), ""},
-		{"Invalid Codec", CompressionCodec(99), []byte("Invalid"), "invalid compression codec"},
-		{"Empty Input", CompressionSnappy, nil, ""},
-		{"Large Input", CompressionZstd, bytes.Repeat([]byte("Large input test "), 1000), ""},
+		{"None", CodecNone, []byte("Hello, World!"), ""},
+		{"Snappy", CodecSnappy, []byte("Snappy compression test"), ""},
+		{"Zlib", CodecZlib, []byte("Zlib compression test"), ""},
+		{"LZ4", CodecLz4, []byte("LZ4 compression test"), ""},
+		{"Zstd", CodecZstd, []byte("Zstd compression test"), ""},
+		{"Invalid Codec", Codec(99), []byte("Invalid"), "invalid compression codec"},
+		{"Empty Input", CodecSnappy, nil, ""},
+		{"Large Input", CodecZstd, bytes.Repeat([]byte("Large input test "), 1000), ""},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Compress
-			compressed, err := Compress(tc.input, tc.codec)
+			// Encode
+			compressed, err := Encode(tc.input, tc.codec)
 			if tc.errMsg != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tc.errMsg)
@@ -37,7 +37,7 @@ func TestCompressDecompress(t *testing.T) {
 			require.NoError(t, err)
 
 			// Decompress
-			decompressed, err := Decompress(compressed, tc.codec)
+			decompressed, err := Decode(compressed, tc.codec)
 			require.NoError(t, err)
 
 			// Compare
@@ -48,20 +48,20 @@ func TestCompressDecompress(t *testing.T) {
 
 func TestCompressDecompressNonMatchingCodecs(t *testing.T) {
 	input := []byte("Mismatched codec test")
-	compressed, err := Compress(input, CompressionSnappy)
+	compressed, err := Encode(input, CodecSnappy)
 	require.NoError(t, err)
 
-	_, err = Decompress(compressed, CompressionZlib)
+	_, err = Decode(compressed, CodecZlib)
 	assert.Error(t, err)
 }
 
 func TestDecompressInvalidInput(t *testing.T) {
 	invalidInput := []byte("This is not compressed data")
-	codecs := []CompressionCodec{CompressionSnappy, CompressionZlib, CompressionLz4, CompressionZstd}
+	codecs := []Codec{CodecSnappy, CodecZlib, CodecLz4, CodecZstd}
 
 	for _, codec := range codecs {
 		t.Run(codec.String(), func(t *testing.T) {
-			_, err := Decompress(invalidInput, codec)
+			_, err := Decode(invalidInput, codec)
 			assert.Error(t, err)
 		})
 	}
@@ -69,14 +69,14 @@ func TestDecompressInvalidInput(t *testing.T) {
 
 func TestCompressDecompressLargeInput(t *testing.T) {
 	largeInput := bytes.Repeat([]byte("Large input test "), 100000) // 1.6MB of data
-	codecs := []CompressionCodec{CompressionNone, CompressionSnappy, CompressionZlib, CompressionLz4, CompressionZstd}
+	codecs := []Codec{CodecNone, CodecSnappy, CodecZlib, CodecLz4, CodecZstd}
 
 	for _, codec := range codecs {
 		t.Run(codec.String(), func(t *testing.T) {
-			compressed, err := Compress(largeInput, codec)
+			compressed, err := Encode(largeInput, codec)
 			require.NoError(t, err)
 
-			decompressed, err := Decompress(compressed, codec)
+			decompressed, err := Decode(compressed, codec)
 			require.NoError(t, err)
 
 			assert.Equal(t, largeInput, decompressed)

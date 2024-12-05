@@ -2,8 +2,8 @@ package sstable
 
 import (
 	"github.com/google/flatbuffers/go"
+	"github.com/thrawn01/lsm-go/internal/compress"
 	"github.com/thrawn01/lsm-go/internal/flatbuf"
-	"github.com/thrawn01/lsm-go/internal/utils"
 )
 
 // encodeIndex encodes a SsTableIndex struct into a flat buffer
@@ -72,7 +72,7 @@ func decodeInfo(b []byte) *Info {
 		IndexLen:         fbInfo.IndexLen(),
 		FilterOffset:     fbInfo.FilterOffset(),
 		FilterLen:        fbInfo.FilterLen(),
-		CompressionCodec: utils.CompressionCodec(fbInfo.CompressionFormat()),
+		CompressionCodec: compress.Codec(fbInfo.CompressionFormat()),
 	}
 	return info
 }

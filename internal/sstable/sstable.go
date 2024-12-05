@@ -1,9 +1,9 @@
 package sstable
 
 import (
+	"github.com/thrawn01/lsm-go/internal/compress"
 	"github.com/thrawn01/lsm-go/internal/flatbuf"
 	"github.com/thrawn01/lsm-go/internal/sstable/bloom"
-	"github.com/thrawn01/lsm-go/internal/utils"
 )
 
 // Info contains meta information about the SSTable
@@ -25,7 +25,7 @@ type Info struct {
 	FilterLen uint64
 
 	// the codec used to compress/decompress SSTable before writing/reading from object storage
-	CompressionCodec utils.CompressionCodec
+	CompressionCodec compress.Codec
 }
 
 func (s *Info) Clone() *Info {
@@ -76,7 +76,7 @@ type Config struct {
 	// The codec used to compress new SSTables. The compression codec used in
 	// existing SSTables already written disk is encoded into the SSTableInfo and
 	// will be used when decompressing the blocks in that SSTable.
-	Compression utils.CompressionCodec
+	Compression compress.Codec
 }
 
 // Table is the in memory representation of an SSTable.
