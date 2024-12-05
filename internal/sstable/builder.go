@@ -80,7 +80,7 @@ func NewBuilder(conf Config) *Builder {
 	return &Builder{
 		conf:         conf,
 		blockBuilder: block.NewBuilder(uint64(conf.BlockSize)),
-		bloomBuilder: bloom.NewFilterBuilder(uint32(conf.FilterBitsPerKey)),
+		bloomBuilder: bloom.NewBuilder(uint32(conf.FilterBitsPerKey)),
 	}
 }
 

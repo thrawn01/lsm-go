@@ -10,7 +10,7 @@ import (
 )
 
 func TestFilterBuilder_Build(t *testing.T) {
-	fb := bloom.NewFilterBuilder(10)
+	fb := bloom.NewBuilder(10)
 	fb.Add([]byte("test1"))
 	fb.Add([]byte("test2"))
 	fb.Add([]byte("test3"))
@@ -21,7 +21,7 @@ func TestFilterBuilder_Build(t *testing.T) {
 	assert.Greater(t, filter.NumProbes, uint16(0))
 }
 func TestFilter_HasKey(t *testing.T) {
-	fb := bloom.NewFilterBuilder(10)
+	fb := bloom.NewBuilder(10)
 	fb.Add([]byte("test1"))
 	fb.Add([]byte("test2"))
 	fb.Add([]byte("test3"))
@@ -35,7 +35,7 @@ func TestFilter_HasKey(t *testing.T) {
 }
 
 func TestEncodeDecode(t *testing.T) {
-	fb := bloom.NewFilterBuilder(10)
+	fb := bloom.NewBuilder(10)
 	fb.Add([]byte("test1"))
 	fb.Add([]byte("test2"))
 	filter := fb.Build()
@@ -48,7 +48,7 @@ func TestEncodeDecode(t *testing.T) {
 }
 
 func TestEmptyFilter(t *testing.T) {
-	fb := bloom.NewFilterBuilder(10)
+	fb := bloom.NewBuilder(10)
 	filter := fb.Build()
 
 	assert.Empty(t, filter.Data)
@@ -57,7 +57,7 @@ func TestEmptyFilter(t *testing.T) {
 }
 
 func TestLargeFilter(t *testing.T) {
-	fb := bloom.NewFilterBuilder(10)
+	fb := bloom.NewBuilder(10)
 	for i := 0; i < 10000; i++ {
 		fb.Add([]byte(fmt.Sprintf("test%d", i)))
 	}
@@ -81,7 +81,7 @@ func TestLargeFilter(t *testing.T) {
 func TestFilterEffective(t *testing.T) {
 	keysToTest := uint32(100000)
 	keySize := types.SizeOfUint32
-	builder := bloom.NewFilterBuilder(10)
+	builder := bloom.NewBuilder(10)
 
 	var i uint32
 	for i = 0; i < keysToTest; i++ {

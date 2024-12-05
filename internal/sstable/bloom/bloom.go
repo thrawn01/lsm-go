@@ -68,7 +68,7 @@ type Builder struct {
 	bitsPerKey uint32
 }
 
-func NewFilterBuilder(bitsPerKey uint32) *Builder {
+func NewBuilder(bitsPerKey uint32) *Builder {
 	return &Builder{
 		keyHashes:  make([]uint64, 0),
 		bitsPerKey: bitsPerKey,
@@ -104,6 +104,7 @@ func (b *Builder) Build() *Filter {
 		Data:      buf,
 	}
 }
+
 func filterBytes(numKeys uint32, bitsPerKey uint32) uint64 {
 	filterBits := numKeys * bitsPerKey
 	// compute filter bytes rounded up to the number of bytes required to fit the filter
